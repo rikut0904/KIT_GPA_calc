@@ -2,7 +2,7 @@ import csv
 import pandas as pd # type: ignore
 import PySimpleGUI as sg
 #GUIデザイン
-sg.theme("LightPurple")
+sg.theme("Default1")
 class GUI():
     def __init__(self):
         #GUIレイアウトの設定
