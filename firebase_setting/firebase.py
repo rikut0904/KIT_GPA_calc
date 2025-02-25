@@ -155,12 +155,21 @@ def firebase_get(state, db):
 
 def delete_subject(ls, subject, state, db):
     print("科目削除")
-    try:
-        user = db.collection("users").document(state.user_id)
-        user_sub = user.collection("subject_data")
-        user_sub.document(subject).delete()
-        print(f"科目が削除されました。")
-        ls = firebase_get(state, db)
-    except Exception as e:
-        print(f"科目の削除に失敗しました: {e}")
+    if state.login:
+        try:
+            user = db.collection("users").document(state.user_id)
+            user_sub = user.collection("subject_data")
+            user_sub.document(subject).delete()
+            print(f"科目が削除されました。")
+            ls = firebase_get(state, db)
+        except Exception as e:
+            print(f"科目の削除に失敗しました: {e}")
+    else:
+        try:
+            for data in ls[1:]:
+                if data[0] == subject:
+                    ls.remove(data)
+            print(f"科目が削除されました。")
+        except Exception as e:
+            print(f"科目の削除に失敗しました: {e}")
     return ls

@@ -124,7 +124,6 @@ def main():
                         with open(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv", "w", newline="", encoding="utf-8") as f:
                             writer = csv.writer(f)
                             writer.writerows(ls)
-                        sg.popup_quick("CSVファイルが保存されました。")
                         header, data = create_table_for_csv(state)  
                         win = reload_gui(state, win, data, header)
                 state.update_state(p_subject_delete=False)
