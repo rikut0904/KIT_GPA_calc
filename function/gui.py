@@ -29,16 +29,20 @@ class GUI():
                        ],
                       [sg.Button("閉じる",key="-setting_exit-"),sg.T("バージョン："),sg.T("1.1.0")]]
         elif state.popup_subject_delete:
-            layout = [[sg.T("科目削除")],
+            layout = [[sg.T("科目修正・削除")],
                       [sg.Table(values=data, headings=header, display_row_numbers=True,
                                       auto_size_columns=True, num_rows=min(25, len(data)),
                                       expand_x=True, expand_y=True)],
-                      [sg.T("削除したい科目名を入力してください。")],
-                      [sg.T("科目名："),sg.I("", key="-subject-",expand_x=True)],
-                      [sg.Button("削除", key="-Subject_delete-"), sg.Button("閉じる",key="-Close-")]]
+                      [sg.T("修正・削除したい科目名を入力してください。")],
+                      [sg.T("　　　 科目名："),sg.I("", key="-subject-",expand_x=True)],
+                      [sg.T("　　　 単位数："),sg.I("", key="-units_num-",expand_x=True)],
+                      [sg.T("評価ポイント："),sg.I("", key="-HPT-",expand_x=True)],
+                      [sg.Checkbox("合否科目",default=False, key="-Pass/Fail-")],
+                      [sg.Button("修正", key="-Subject_update-"), sg.Button("削除", key="-Subject_delete-"), sg.Button("閉じる",key="-Close-")]]
         else: #GPA計算画面
-            layout = [[sg.T("　　　　  累積GPA："),sg.T("0.0", key="-GPA-")],
-                    [sg.T("正課学習ポイント："),sg.T("0.0", key="-SGPT-")],
+            layout = [[sg.T("　　　　  累積GPA："),sg.T("0.00", key="-GPA-")],
+                      [sg.T("　　　 累積単位数："),sg.T("000", key="-all_total_units_num-")],
+                    [sg.T("正課学習ポイント："),sg.T("0.00", key="-SGPT-")],
                     [sg.T("", key = "-txt-")],
                     [sg.T("　　　 科目名："),sg.I("", key="-subject-",expand_x=True)],
                     [sg.T("　　　 単位数："),sg.I("", key="-units_num-",expand_x=True)],
@@ -48,7 +52,7 @@ class GUI():
                     sg.FileBrowse("ファイル選択"),],
                     [sg.Button("Submit", key="-Submit-"), sg.Button("Final", key="-Final-"),
                     sg.Button("CSVファイル", key="-CSV-"), sg.Button("ファイルインポート", key="-File_Import-"),
-                    sg.Button("科目削除", key="-Subject_Delete_UI-"), sg.Button("GPAリセット", key="-GPA_reset-"),
+                    sg.Button("科目修正・削除", key="-Subject_UI-"), sg.Button("GPAリセット", key="-GPA_reset-"),
                     sg.Button("設定", key="-Setting-")]]
         self.win = sg.Window("GPA計算", layout, font = (None, 15),
                              finalize=True, resizable = True)

@@ -109,6 +109,7 @@ def delete_user(state, win, auth, db):
     print("ユーザー削除")
     try:
         auth.delete_user_account(state.idToken)
+        db.collection("users").document(state.user_id).collection("subject_data").delete()
         db.collection("users").document(state.user_id).delete()
         print(f"ユーザーが削除されました。")
         state.update_state(login=False, user_name_param="", user_email_param="", user_id_param="", idToken_param="")
@@ -153,9 +154,57 @@ def firebase_get(state, db):
     else:
         return [["科目名", "単位数", "評価ポイント", "合否科目"]]
 
+# 科目修正
+def update_subject(ls, subject, units_num, HPT, Pass_Fail, state, db):
+    print("科目修正")
+    if state.isLogin:
+        try:
+            data = db.collection("users").document(state.user_id).collection("subject_data").document(subject)
+            subject_data = data.get()
+
+            if subject_data.exists:
+                old_data = subject_data.to_dict()
+                old_units_num = old_data.get("subject_unit", "")
+                old_HPT = old_data.get("subject_grade", "")
+                old_Pass_Fail = old_data.get("subject_pass_fail", "")
+                print(old_units_num, old_HPT, old_Pass_Fail)
+            if units_num == "":
+                units_num = old_units_num
+            if HPT == "":
+                HPT = old_HPT
+            if Pass_Fail == "":
+                Pass_Fail = old_Pass_Fail
+            data.update({
+                "subject_unit": units_num,
+                "subject_grade": HPT,
+                "subject_pass_fail": Pass_Fail
+            })
+            print(f"科目が修正されました。")
+            ls = firebase_get(state, db)
+        except Exception as e:
+            print(f"科目の修正に失敗しました: {e}")
+    else:
+        try:
+            for data in ls[1:]:
+                old_subject, old_units_num, old_HPT, old_Pass_Fail = data
+                print(old_subject, old_units_num, old_HPT, old_Pass_Fail)
+                if old_subject == subject:
+                    if units_num == "":
+                        units_num = old_units_num
+                    if HPT == "":
+                        HPT = old_HPT
+                    if Pass_Fail == "":
+                        Pass_Fail = old_Pass_Fail
+                    data[1], data[2], data[3] = units_num, HPT, Pass_Fail
+            print(f"科目が修正されました。")
+        except Exception as e:
+            print(f"科目の修正に失敗しました: {e}")
+    return ls
+
+# 科目削除
 def delete_subject(ls, subject, state, db):
     print("科目削除")
-    if state.login:
+    if state.isLogin:
         try:
             user = db.collection("users").document(state.user_id)
             user_sub = user.collection("subject_data")
