@@ -1,10 +1,12 @@
 import csv
 import pandas as pd
 import PySimpleGUI as sg
-from firebase_setting.firebase import get_auth, get_database
+from firebase_setting.firebase import get_auth, get_database, firebase_save, delete_subject
 from function import state
 from function.gui import GUI, reload_gui
 from function.logic_function import GPA_calc, create_table_for_csv, setting_function
+
+# Todo: firebase取得後の計算を修正(計算ロジックを変更)
 
 # 必要なサービスを取得
 auth = get_auth()
@@ -15,13 +17,14 @@ def main():
     ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
     total_HPT, total_units_num, all_total_units_num = 0, 0, 0
     state.update_state(login=False, p_login=False, p_signup=False, p_setting=False,
-                       user_name_param="ログインしてください",
-                       user_email_param="ログインしてください",
-                       user_id_param="ログインしてください",
-                       idToken_param="ログインしてください")
+                       user_name_param="",
+                       user_email_param="",
+                       user_id_param="",
+                       idToken_param="")
     gui = GUI(state)
     win = gui.win
     while True:
+        print(ls)
         eve, val = win.read()
         if eve == sg.WIN_CLOSED:
             break
@@ -31,7 +34,7 @@ def main():
             win["-UserName-"].update(state.user_name)
             win["-email-"].update(state.user_email)
         elif state.popup_setting:
-            win = setting_function(state, win, eve, val, auth, db)
+            win, ls = setting_function(ls, state, win, eve, val, auth, db)
         elif eve == "-Submit-":    #Submitボタンが押された際の動作
             #科目名、単位数、評価ポイントをGUIより入力しリストに格納
             if val["-subject-"] != "" and val["-units_num-"] != "" and val["-HPT-"] != "":
@@ -41,6 +44,9 @@ def main():
                 Pass_Fail = val["-Pass/Fail-"]
                 ls, HPT_num, total_HPT, total_units_num, all_total_units_num = GPA_calc(ls, subject, units_num, HPT, Pass_Fail, total_HPT, total_units_num, all_total_units_num)
                 txt = "" if HPT_num != "error" else "Point input error"
+                if state.isLogin:
+                    ls = firebase_save(ls, state, db)
+                print(ls)
                 win["-txt-"].update(txt)
                 win["-subject-"].update("")
                 win["-units_num-"].update("")
@@ -51,6 +57,7 @@ def main():
         elif eve == "-Final-":  #finalボタンが押された際の動作
             #Submitで入力された成績情報をもとにGPAを計算
             if total_HPT != 0 or total_units_num != 0:
+                print(ls)
                 GPA = total_HPT / total_units_num
                 SGPT = GPA * all_total_units_num
                 win["-GPA-"].update(f'{GPA:.1f}')
@@ -72,7 +79,10 @@ def main():
                             HPT = row[2]
                             Pass_Fail = val["-Pass/Fail-"]
                             ls, HPT_num, total_HPT, total_units_num, all_total_units_num = GPA_calc(ls, subject, units_num, HPT, Pass_Fail, total_HPT, total_units_num, all_total_units_num)
+                    if state.isLogin:
+                        ls = firebase_save(ls, state, db)
                     txt = ("ファイルが正常にインポートされました。")
+                    print(ls)
                 except Exception as e:
                     txt = f"ファイルのインポートに失敗しました。：{str(e)}"
             else:
@@ -83,24 +93,41 @@ def main():
             win["-SGPT-"].update(SGPT)
             win["-inputFilePath-"].update("")
             win["-txt-"].update(txt)
-        elif eve == "-CSV-":    #CSVファイルボタンが押された際の動作
+        elif eve == "-CSV-" or eve == "-Subject_Delete_UI-":    #CSVファイルボタンが押された際の動作
             #Submitで入力された成績情報をCSVファイル化させ表形式でGUIに表示
-            with open("subject_grades_data.csv", "w", newline="", encoding="utf-8") as f:
+            with open(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv", "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerows(ls)
-            sg.popup_quick("CSVファイルが保存されました。")
-            header, data = create_table_for_csv()
-            layout_table = [[sg.Table(values=data, headings=header, display_row_numbers=True,
-                                      auto_size_columns=True, num_rows=min(25, len(data)),
-                                      expand_x=True, expand_y=True)],
-                            [sg.Button("Close", key = "-Close-")]]
-            table_window = sg.Window('CSVファイル内容', layout_table, font = (None,15),
-                                     size=(700,150), finalize=True, resizable = True)
-            while True:
-                event, value = table_window.read()
-                if event == sg.WIN_CLOSED or event == "-Close-":
-                    break
-            table_window.close()
+            header, data = create_table_for_csv(state)
+            if eve == "-CSV-":
+                layout_tb = [[sg.Table(values=data, headings=header, display_row_numbers=True,
+                                        auto_size_columns=True, num_rows=min(25, len(data)),
+                                        expand_x=True, expand_y=True)],
+                                [sg.Button("Close", key = "-Close-")]]
+                tb_win = sg.Window('CSVファイル内容', layout_tb, font = (None,15),
+                                        size=(700,150), finalize=True, resizable = True)
+                while True:
+                    tb_eve, tb_val = tb_win.read()
+                    if tb_eve == sg.WIN_CLOSED or tb_eve == "-Close-":
+                        break
+                tb_win.close()
+            elif eve == "-Subject_Delete_UI-":
+                state.update_state(p_subject_delete=True)
+                win = reload_gui(state, win, data, header)
+                while True:
+                    eve, val = win.read()
+                    if eve == sg.WIN_CLOSED or eve == "-Close-":
+                        break
+                    elif eve == "-Subject_delete-":
+                        subject = val["-subject-"]
+                        ls = delete_subject(ls, subject, state, db)
+                        with open(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv", "w", newline="", encoding="utf-8") as f:
+                            writer = csv.writer(f)
+                            writer.writerows(ls)
+                        header, data = create_table_for_csv(state)  
+                        win = reload_gui(state, win, data, header)
+                state.update_state(p_subject_delete=False)
+                win = reload_gui(state, win)
         elif eve == "-GPA_reset-":  #GPAリセットボタンが押された際の動作
             #成績情報を削除してよいかを確認し、成績情報を削除する
             res = sg.popup_yes_no("成績情報をリセットしますか？\n※データベースは削除されません。")

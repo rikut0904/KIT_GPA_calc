@@ -3,9 +3,10 @@ import PySimpleGUI as sg
 #GUIデザイン
 sg.theme("Default1")
 class GUI():
-    def __init__(self,state):
+    def __init__(self,state, data=None, header=None):
         if state.popup_login: #ログイン画面
             layout = [[sg.T("新規登録") if state.popup_signup else sg.T("ログイン")],
+                      [sg.T("", key = "-txt-")],
                       [sg.T("メールアドレス："),sg.I("", key="-email-",expand_x=True)],
                       [(sg.T("ユーザー名    ："),sg.I("", key="-UserName-",expand_x=True))
                        if state.popup_signup else sg.T("")],
@@ -27,6 +28,14 @@ class GUI():
                         if state.isLogin else sg.Button("ログイン", key="-Login-")),
                        ],
                       [sg.Button("閉じる",key="-setting_exit-"),sg.T("バージョン："),sg.T("1.1.0")]]
+        elif state.popup_subject_delete:
+            layout = [[sg.T("科目削除")],
+                      [sg.Table(values=data, headings=header, display_row_numbers=True,
+                                      auto_size_columns=True, num_rows=min(25, len(data)),
+                                      expand_x=True, expand_y=True)],
+                      [sg.T("削除したい科目名を入力してください。")],
+                      [sg.T("科目名："),sg.I("", key="-subject-",expand_x=True)],
+                      [sg.Button("削除", key="-Subject_delete-"), sg.Button("閉じる",key="-Close-")]]
         else: #GPA計算画面
             layout = [[sg.T("　　　　  累積GPA："),sg.T("0.0", key="-GPA-")],
                     [sg.T("正課学習ポイント："),sg.T("0.0", key="-SGPT-")],
@@ -39,17 +48,17 @@ class GUI():
                     sg.FileBrowse("ファイル選択"),],
                     [sg.Button("Submit", key="-Submit-"), sg.Button("Final", key="-Final-"),
                     sg.Button("CSVファイル", key="-CSV-"), sg.Button("ファイルインポート", key="-File_Import-"),
-                    sg.Button("GPAリセット", key="-GPA_reset-"),
+                    sg.Button("科目削除", key="-Subject_Delete_UI-"), sg.Button("GPAリセット", key="-GPA_reset-"),
                     sg.Button("設定", key="-Setting-")]]
         self.win = sg.Window("GPA計算", layout, font = (None, 15),
                              finalize=True, resizable = True)
 
-def reload_gui(state, win):
+def reload_gui(state, win, data=None, header=None):
     try:
         print("reload_guiが呼び出されました")
         print(state)
         
-        gui = GUI(state)
+        gui = GUI(state, data, header)
         new_win = gui.win
         
         if new_win is None:
