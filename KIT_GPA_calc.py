@@ -1,12 +1,12 @@
 import csv
 import pandas as pd
 import PySimpleGUI as sg
-from firebase_setting.firebase import get_auth, get_database, firebase_save, firebase_get
+from firebase_setting.firebase import get_auth, get_database, firebase_save, delete_subject
 from function import state
 from function.gui import GUI, reload_gui
 from function.logic_function import GPA_calc, create_table_for_csv, setting_function
 
-# Todo: firebaseに保存されているデータを取得・選択削除
+# Todo: firebase取得後の計算を修正(計算ロジックを変更)
 
 # 必要なサービスを取得
 auth = get_auth()
@@ -17,10 +17,10 @@ def main():
     ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
     total_HPT, total_units_num, all_total_units_num = 0, 0, 0
     state.update_state(login=False, p_login=False, p_signup=False, p_setting=False,
-                       user_name_param="ログインしてください",
-                       user_email_param="ログインしてください",
-                       user_id_param="ログインしてください",
-                       idToken_param="ログインしてください")
+                       user_name_param="",
+                       user_email_param="",
+                       user_id_param="",
+                       idToken_param="")
     gui = GUI(state)
     win = gui.win
     while True:
@@ -45,8 +45,7 @@ def main():
                 ls, HPT_num, total_HPT, total_units_num, all_total_units_num = GPA_calc(ls, subject, units_num, HPT, Pass_Fail, total_HPT, total_units_num, all_total_units_num)
                 txt = "" if HPT_num != "error" else "Point input error"
                 if state.isLogin:
-                    # Todo: Submitボタンが押された際にfirebaseに保存する(ログイン時)
-                    firebase_save(ls, state, db)
+                    ls = firebase_save(ls, state, db)
                 print(ls)
                 win["-txt-"].update(txt)
                 win["-subject-"].update("")
@@ -67,7 +66,6 @@ def main():
                 txt = "成績を入力またはCSVファイルをインポートしてください。"
                 win["-txt-"].update(txt)
         elif eve == "-File_Import-":    #ファイルインポートボタンが押された際の動作
-            # Todo: ファイルインポート時にfirebaseに保存する(ログイン時)
             #外部からCSVファイルをインポートし成績情報を入力する。
             File_name = val["-inputFilePath-"]
             if File_name:
@@ -81,6 +79,8 @@ def main():
                             HPT = row[2]
                             Pass_Fail = val["-Pass/Fail-"]
                             ls, HPT_num, total_HPT, total_units_num, all_total_units_num = GPA_calc(ls, subject, units_num, HPT, Pass_Fail, total_HPT, total_units_num, all_total_units_num)
+                    if state.isLogin:
+                        ls = firebase_save(ls, state, db)
                     txt = ("ファイルが正常にインポートされました。")
                     print(ls)
                 except Exception as e:
@@ -93,24 +93,42 @@ def main():
             win["-SGPT-"].update(SGPT)
             win["-inputFilePath-"].update("")
             win["-txt-"].update(txt)
-        elif eve == "-CSV-":    #CSVファイルボタンが押された際の動作
+        elif eve == "-CSV-" or eve == "-Subject_Delete_UI-":    #CSVファイルボタンが押された際の動作
             #Submitで入力された成績情報をCSVファイル化させ表形式でGUIに表示
-            with open("subject_grades_data.csv", "w", newline="", encoding="utf-8") as f:
+            with open(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv", "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerows(ls)
-            sg.popup_quick("CSVファイルが保存されました。")
-            header, data = create_table_for_csv()
-            layout_tb = [[sg.Table(values=data, headings=header, display_row_numbers=True,
-                                      auto_size_columns=True, num_rows=min(25, len(data)),
-                                      expand_x=True, expand_y=True)],
-                            [sg.Button("Close", key = "-Close-")]]
-            tb_win = sg.Window('CSVファイル内容', layout_tb, font = (None,15),
-                                     size=(700,150), finalize=True, resizable = True)
-            while True:
-                tb_eve = tb_win.read()
-                if tb_eve == sg.WIN_CLOSED or tb_eve == "-Close-":
-                    break
-            tb_win.close()
+            header, data = create_table_for_csv(state)
+            if eve == "-CSV-":
+                layout_tb = [[sg.Table(values=data, headings=header, display_row_numbers=True,
+                                        auto_size_columns=True, num_rows=min(25, len(data)),
+                                        expand_x=True, expand_y=True)],
+                                [sg.Button("Close", key = "-Close-")]]
+                tb_win = sg.Window('CSVファイル内容', layout_tb, font = (None,15),
+                                        size=(700,150), finalize=True, resizable = True)
+                while True:
+                    tb_eve, tb_val = tb_win.read()
+                    if tb_eve == sg.WIN_CLOSED or tb_eve == "-Close-":
+                        break
+                tb_win.close()
+            elif eve == "-Subject_Delete_UI-":
+                state.update_state(p_subject_delete=True)
+                win = reload_gui(state, win, data, header)
+                while True:
+                    eve, val = win.read()
+                    if eve == sg.WIN_CLOSED or eve == "-Close-":
+                        break
+                    elif eve == "-Subject_delete-":
+                        subject = val["-subject-"]
+                        ls = delete_subject(ls, subject, state, db)
+                        with open(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv", "w", newline="", encoding="utf-8") as f:
+                            writer = csv.writer(f)
+                            writer.writerows(ls)
+                        sg.popup_quick("CSVファイルが保存されました。")
+                        header, data = create_table_for_csv(state)  
+                        win = reload_gui(state, win, data, header)
+                state.update_state(p_subject_delete=False)
+                win = reload_gui(state, win)
         elif eve == "-GPA_reset-":  #GPAリセットボタンが押された際の動作
             #成績情報を削除してよいかを確認し、成績情報を削除する
             res = sg.popup_yes_no("成績情報をリセットしますか？\n※データベースは削除されません。")

@@ -40,8 +40,8 @@ def GPA_calc(ls,subject,units_num,HPT,Pass_Fail,total_HPT,total_units_num, all_t
     return ls,HPT_num, total_HPT, total_units_num, all_total_units_num
 
 #CSVファイルを読み取り、表を作成
-def create_table_for_csv():
-    df = pd.read_csv("subject_grades_data.csv")
+def create_table_for_csv(state):
+    df = pd.read_csv(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv")
     data = df.values.tolist()
     header_list = list(df.columns)
     return header_list, data
@@ -74,8 +74,6 @@ def setting_function(ls, state, win, eve, val, auth, db):
         password = val["-password-"]
         state.update_state(user_email_param=email)
         win, ls = login_function(ls, password, state, win, auth, db)
-        win["-UserName-"].update(state.user_name)
-        win["-email-"].update(state.user_email)
     elif eve == "-UserCreate-":  #ユーザー作成ボタンが押された際の動作
         state.update_state(p_signup=True)
         win = reload_gui(state, win)
@@ -85,8 +83,6 @@ def setting_function(ls, state, win, eve, val, auth, db):
         password = val["-password-"]
         state.update_state(user_name_param=UserName, user_email_param=email)
         win, ls = create_user(ls, password, state, win, auth, db)
-        win["-UserName-"].update(state.user_name)
-        win["-email-"].update(state.user_email)
     elif eve == "-Logout-": # ログアウト
         ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
         print(ls)
@@ -99,6 +95,4 @@ def setting_function(ls, state, win, eve, val, auth, db):
             ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
             print(ls)
             win = delete_user(state, win, auth, db)
-            win["-UserName-"].update(state.user_name)
-            win["-email-"].update(state.user_email)
     return win, ls

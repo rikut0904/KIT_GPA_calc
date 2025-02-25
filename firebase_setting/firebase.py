@@ -50,15 +50,18 @@ def login_function(ls, password, state, win, auth, db):
         if user_data.exists:
             UserName = user_data.get("UserName")
             state.update_state(user_name_param=UserName, user_id_param=UserID, idToken_param=user["idToken"])
-            firebase_save(ls, state, db)
-            ls = firebase_get(state, db)
+            ls = firebase_save(ls, state, db)
             print(ls)
         print(f"ログイン成功")
         state.update_state(login=True, p_login=False)
         win = reload_gui(state, win)
+        win["-UserName-"].update(state.user_name)
+        win["-email-"].update(state.user_email)
     except Exception as e:
         print(f"ログインに失敗しました: {e}")
-        state.update_state(user_email_param="ログインしてください")
+        txt = f"ログインに失敗しました。{e}"
+        win["-txt-"].update(txt)
+        state.update_state(user_email_param="")
     return win, ls
 
 # ユーザー作成
@@ -77,23 +80,28 @@ def create_user(ls, password, state, win, auth, db):
                 "email": state.user_email,
                 "time_stamp": firestore.SERVER_TIMESTAMP,
             })
-            firebase_save(ls, state, db)
-            ls = firebase_get(state, db)
+            ls = firebase_save(ls, state, db)
             print(ls)
         print(f"ユーザーが作成されました。")
         state.update_state(login=True, p_login=False, p_signup=False)
         win = reload_gui(state, win)
+        win["-UserName-"].update(state.user_name)
+        win["-email-"].update(state.user_email)
     except Exception as e:
         print(f"ユーザーの作成に失敗しました: {e}")
-        state.update_state(user_name_param="ログインしてください", user_email_param="ログインしてください")
+        txt = f"ユーザーの作成に失敗しました。{e}"
+        win["-txt-"].update(txt)
+        state.update_state(user_name_param="", user_email_param="")
     return win, ls
 
 # ログアウト
 def logout_function(state, win, auth):
     print("ログアウト")
     auth.current_user = None
-    state.update_state(login=False, p_login=False, p_signup=False, user_name_param="ログインしてください", user_email_param="ログインしてください", user_id_param="ログインしてください", idToken_param="ログインしてください")
+    state.update_state(login=False, p_login=False, p_signup=False, user_name_param="", user_email_param="", user_id_param="", idToken_param="")
     win = reload_gui(state, win)
+    win["-UserName-"].update(state.user_name)
+    win["-email-"].update(state.user_email)
     return win
 
 # ユーザー削除
@@ -103,8 +111,10 @@ def delete_user(state, win, auth, db):
         auth.delete_user_account(state.idToken)
         db.collection("users").document(state.user_id).delete()
         print(f"ユーザーが削除されました。")
-        state.update_state(login=False, user_name_param="ログインしてください", user_email_param="ログインしてください", user_id_param="ログインしてください", idToken_param="ログインしてください")
+        state.update_state(login=False, user_name_param="", user_email_param="", user_id_param="", idToken_param="")
         win = reload_gui(state, win)
+        win["-UserName-"].update(state.user_name)
+        win["-email-"].update(state.user_email)
     except Exception as e:
         print(f"ユーザーの削除に失敗しました: {e}")
     return win
@@ -128,6 +138,7 @@ def firebase_save(ls, state, db):
                     "subject_grade": subject_grade,
                     "subject_pass_fail": subject_pass_fail
                 })
+    return firebase_get(state, db)
 
 # firebaseから取得
 def firebase_get(state, db):
@@ -141,3 +152,15 @@ def firebase_get(state, db):
         return ls
     else:
         return [["科目名", "単位数", "評価ポイント", "合否科目"]]
+
+def delete_subject(ls, subject, state, db):
+    print("科目削除")
+    try:
+        user = db.collection("users").document(state.user_id)
+        user_sub = user.collection("subject_data")
+        user_sub.document(subject).delete()
+        print(f"科目が削除されました。")
+        ls = firebase_get(state, db)
+    except Exception as e:
+        print(f"科目の削除に失敗しました: {e}")
+    return ls
