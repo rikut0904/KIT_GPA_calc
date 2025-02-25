@@ -47,13 +47,14 @@ def login_function(ls, password, state, win, auth, db):
         # Firestore にデータを保存・取得
         user_ref = db.collection("users").document(UserID)
         user_data = user_ref.get()
-        UserName = user_data.get("UserName")
-        state.update_state(login=True, p_login=False, user_name_param=UserName, user_id_param=UserID, idToken_param=user["idToken"])
         if user_data.exists:
+            UserName = user_data.get("UserName")
+            state.update_state(user_name_param=UserName, user_id_param=UserID, idToken_param=user["idToken"])
             firebase_save(ls, state, db)
             ls = firebase_get(state, db)
             print(ls)
         print(f"ログイン成功")
+        state.update_state(login=True, p_login=False)
         win = reload_gui(state, win)
     except Exception as e:
         print(f"ログインに失敗しました: {e}")
@@ -69,7 +70,7 @@ def create_user(ls, password, state, win, auth, db):
         # Firestore にデータを保存
         user_ref = db.collection("users").document(UserID)
         user_data = user_ref.get()
-        state.update_state(login=True, p_login=False, p_signup=False, user_id_param=UserID, idToken_param=user["idToken"])
+        state.update_state(user_id_param=UserID, idToken_param=user["idToken"])
         if not(user_data.exists):
             user_ref.set({
                 "UserName": state.user_name,
@@ -80,6 +81,7 @@ def create_user(ls, password, state, win, auth, db):
             ls = firebase_get(state, db)
             print(ls)
         print(f"ユーザーが作成されました。")
+        state.update_state(login=True, p_login=False, p_signup=False)
         win = reload_gui(state, win)
     except Exception as e:
         print(f"ユーザーの作成に失敗しました: {e}")
@@ -120,7 +122,7 @@ def firebase_save(ls, state, db):
                     "time_stamp": firestore.SERVER_TIMESTAMP
                 })
                 subject_name, subject_unit, subject_grade, subject_pass_fail = data
-                user_sub.document(subject_name).update({
+                user_sub.document(subject_name).set({
                     "subject_name": subject_name,
                     "subject_unit": subject_unit,
                     "subject_grade": subject_grade,

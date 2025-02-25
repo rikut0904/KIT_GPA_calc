@@ -44,7 +44,7 @@ def main():
                 Pass_Fail = val["-Pass/Fail-"]
                 ls, HPT_num, total_HPT, total_units_num, all_total_units_num = GPA_calc(ls, subject, units_num, HPT, Pass_Fail, total_HPT, total_units_num, all_total_units_num)
                 txt = "" if HPT_num != "error" else "Point input error"
-                if state.login:
+                if state.isLogin:
                     # Todo: Submitボタンが押された際にfirebaseに保存する(ログイン時)
                     firebase_save(ls, state, db)
                 print(ls)
