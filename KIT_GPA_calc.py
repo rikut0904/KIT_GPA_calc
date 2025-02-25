@@ -1,7 +1,7 @@
 import csv
 import pandas as pd
 import PySimpleGUI as sg
-from firebase_setting.firebase import get_auth, get_database, firebase_save, delete_subject
+from firebase_setting.firebase import get_auth, get_database, firebase_save, update_subject, delete_subject
 from function import state
 from function.gui import GUI, reload_gui
 from function.logic_function import GPA_calc, create_table_for_csv, setting_function, check_subject_error
@@ -90,7 +90,7 @@ def main():
             win["-SGPT-"].update(SGPT)
             win["-inputFilePath-"].update("")
             win["-txt-"].update(txt)
-        elif eve == "-CSV-" or eve == "-Subject_Delete_UI-":    #CSVファイルボタンが押された際の動作
+        elif eve == "-CSV-" or eve == "-Subject_UI-":    #CSVファイルボタンが押された際の動作
             #Submitで入力された成績情報をCSVファイル化させ表形式でGUIに表示
             with open(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv", "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
@@ -108,13 +108,25 @@ def main():
                     if tb_eve == sg.WIN_CLOSED or tb_eve == "-Close-":
                         break
                 tb_win.close()
-            elif eve == "-Subject_Delete_UI-":
+            elif eve == "-Subject_UI-":
                 state.update_state(p_subject_delete=True)
                 win = reload_gui(state, win, data, header)
                 while True:
                     eve, val = win.read()
                     if eve == sg.WIN_CLOSED or eve == "-Close-":
                         break
+                    elif eve == "-Subject_update-":
+                        subject = val["-subject-"]
+                        units_num = int(val["-units_num-"]) if val["-units_num-"] != "" else ""
+                        HPT = val["-HPT-"] if val["-HPT-"] != "" else ""
+                        Pass_Fail = val["-Pass/Fail-"] if val["-Pass/Fail-"] != "" else ""
+                        print(subject, units_num, HPT, Pass_Fail)
+                        ls = update_subject(ls, subject, units_num, HPT, Pass_Fail, state, db)
+                        with open(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv", "w", newline="", encoding="utf-8") as f:
+                            writer = csv.writer(f)
+                            writer.writerows(ls)
+                        header, data = create_table_for_csv(state)  
+                        win = reload_gui(state, win, data, header)
                     elif eve == "-Subject_delete-":
                         subject = val["-subject-"]
                         ls = delete_subject(ls, subject, state, db)

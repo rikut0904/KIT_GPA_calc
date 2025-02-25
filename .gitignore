@@ -163,3 +163,4 @@ node_modules/
 package-lock.json
 package.json
 firebase_setting/firebase_api.json
+subject_grades_data_rikuto.csv
