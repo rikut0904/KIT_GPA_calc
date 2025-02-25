@@ -1,4 +1,5 @@
 科目名,単位数,評価ポイント,合否科目
-a,2,S,True
-b,2,A,True
+a,2,S,False
+b,2,A,False
 c,1,合,True
+d,1,否,True

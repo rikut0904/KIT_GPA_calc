@@ -21,23 +21,63 @@ def HPT_Checker(HPT):
         HPT_num = ""
     else:
         HPT_num = "error"
+    print("HPT:",HPT)
+    print("HPT_num:",HPT_num)
     return HPT_num
 
+#科目名の重複チェック
+def check_subject(ls, subject):
+    if len(ls) > 1:
+        for data in ls[1:]:
+            if data[0] != subject:
+                return True
+        return False    
+    else:
+        return True
+
+#科目のエラーチェック
+def check_subject_error(ls, subject, units_num, HPT, Pass_Fail):
+    HPT_num = HPT_Checker(HPT)
+    if HPT_num != "error":
+        if check_subject(ls, subject):
+            ls.append([subject, units_num, HPT, Pass_Fail])
+            txt = ""
+        else:
+            txt = "subject error"
+    else:
+        txt = "input error" if HPT_num != "error" else "Point input error"
+    return txt, ls
 
 #GPAの計算
-def GPA_calc(ls,subject,units_num,HPT,Pass_Fail,total_HPT,total_units_num, all_total_units_num):
-    HPT_num = HPT_Checker(HPT)
-    if HPT_num == "":
-        total_HPT, total_units_num = total_HPT, total_units_num
-        all_total_units_num += units_num
-        ls.append([subject, units_num, HPT, Pass_Fail])
-    elif HPT_num != "error":
-        if not Pass_Fail:
-            total_HPT += HPT_num * units_num
-            total_units_num += units_num
-        all_total_units_num += units_num
-        ls.append([subject, units_num, HPT, Pass_Fail])
-    return ls,HPT_num, total_HPT, total_units_num, all_total_units_num
+def GPA_calc(ls):
+    total_HPT, total_units_num, all_total_units_num = 0, 0, 0
+    txt = ""
+    try:
+        if len(ls) > 1:
+            for data in ls[1:]:
+                subject, units_num, HPT, Pass_Fail = data
+                HPT_num = HPT_Checker(HPT)
+                if HPT_num == "":
+                    if HPT == "合":
+                        print("合格")
+                        all_total_units_num += units_num
+                    else:
+                        print("不合格")
+                elif HPT_num != "error":
+                    if HPT_num > 0:
+                        print("not error:",HPT_num)
+                        total_HPT += HPT_num * units_num
+                        total_units_num += units_num
+                        all_total_units_num += units_num
+                    else:
+                        print("落単科目")
+                else:
+                    txt = "input error"
+        else:
+            txt = "入力がありません"
+    except Exception as e:
+        print(f"GPA計算に失敗しました: {e}")
+    return total_HPT, total_units_num, all_total_units_num, txt
 
 #CSVファイルを読み取り、表を作成
 def create_table_for_csv(state):

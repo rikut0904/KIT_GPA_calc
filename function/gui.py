@@ -37,8 +37,9 @@ class GUI():
                       [sg.T("科目名："),sg.I("", key="-subject-",expand_x=True)],
                       [sg.Button("削除", key="-Subject_delete-"), sg.Button("閉じる",key="-Close-")]]
         else: #GPA計算画面
-            layout = [[sg.T("　　　　  累積GPA："),sg.T("0.0", key="-GPA-")],
-                    [sg.T("正課学習ポイント："),sg.T("0.0", key="-SGPT-")],
+            layout = [[sg.T("　　　　  累積GPA："),sg.T("0.00", key="-GPA-")],
+                      [sg.T("　　　 累積単位数："),sg.T("000", key="-all_total_units_num-")],
+                    [sg.T("正課学習ポイント："),sg.T("0.00", key="-SGPT-")],
                     [sg.T("", key = "-txt-")],
                     [sg.T("　　　 科目名："),sg.I("", key="-subject-",expand_x=True)],
                     [sg.T("　　　 単位数："),sg.I("", key="-units_num-",expand_x=True)],

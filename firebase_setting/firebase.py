@@ -109,6 +109,7 @@ def delete_user(state, win, auth, db):
     print("ユーザー削除")
     try:
         auth.delete_user_account(state.idToken)
+        db.collection("users").document(state.user_id).collection("subject_data").delete()
         db.collection("users").document(state.user_id).delete()
         print(f"ユーザーが削除されました。")
         state.update_state(login=False, user_name_param="", user_email_param="", user_id_param="", idToken_param="")
@@ -155,7 +156,7 @@ def firebase_get(state, db):
 
 def delete_subject(ls, subject, state, db):
     print("科目削除")
-    if state.login:
+    if state.isLogin:
         try:
             user = db.collection("users").document(state.user_id)
             user_sub = user.collection("subject_data")
