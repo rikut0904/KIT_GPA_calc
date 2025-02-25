@@ -46,7 +46,7 @@ def create_table_for_csv():
     header_list = list(df.columns)
     return header_list, data
 
-def setting_function(state, win, eve, val, auth, db):
+def setting_function(ls, state, win, eve, val, auth, db):
     if eve == "-setting_exit-":
         state.update_state(p_setting=False)
         win = reload_gui(state, win)
@@ -73,7 +73,7 @@ def setting_function(state, win, eve, val, auth, db):
         email = val["-email-"]
         password = val["-password-"]
         state.update_state(user_email_param=email)
-        win = login_function(password, state, win, auth, db)
+        win, ls = login_function(ls, password, state, win, auth, db)
         win["-UserName-"].update(state.user_name)
         win["-email-"].update(state.user_email)
     elif eve == "-UserCreate-":  #ユーザー作成ボタンが押された際の動作
@@ -84,17 +84,21 @@ def setting_function(state, win, eve, val, auth, db):
         UserName = val["-UserName-"]
         password = val["-password-"]
         state.update_state(user_name_param=UserName, user_email_param=email)
-        win = create_user(password, state, win, auth, db)
+        win, ls = create_user(ls, password, state, win, auth, db)
         win["-UserName-"].update(state.user_name)
         win["-email-"].update(state.user_email)
     elif eve == "-Logout-": # ログアウト
+        ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
+        print(ls)
         win = logout_function(state, win, auth)
         win["-UserName-"].update(state.user_name)
         win["-email-"].update(state.user_email)
     elif eve == "-Delete-":
         delete_eve = sg.popup_yes_no("ユーザーを削除しますか？", font = (None, 15))
         if delete_eve == "Yes":
+            ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
+            print(ls)
             win = delete_user(state, win, auth, db)
             win["-UserName-"].update(state.user_name)
             win["-email-"].update(state.user_email)
-    return win
+    return win, ls

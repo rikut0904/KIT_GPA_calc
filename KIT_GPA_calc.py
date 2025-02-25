@@ -1,10 +1,12 @@
 import csv
 import pandas as pd
 import PySimpleGUI as sg
-from firebase_setting.firebase import get_auth, get_database
+from firebase_setting.firebase import get_auth, get_database, firebase_save, firebase_get
 from function import state
 from function.gui import GUI, reload_gui
 from function.logic_function import GPA_calc, create_table_for_csv, setting_function
+
+# Todo: firebaseに保存されているデータを取得・選択削除
 
 # 必要なサービスを取得
 auth = get_auth()
@@ -22,6 +24,7 @@ def main():
     gui = GUI(state)
     win = gui.win
     while True:
+        print(ls)
         eve, val = win.read()
         if eve == sg.WIN_CLOSED:
             break
@@ -31,7 +34,7 @@ def main():
             win["-UserName-"].update(state.user_name)
             win["-email-"].update(state.user_email)
         elif state.popup_setting:
-            win = setting_function(state, win, eve, val, auth, db)
+            win, ls = setting_function(ls, state, win, eve, val, auth, db)
         elif eve == "-Submit-":    #Submitボタンが押された際の動作
             #科目名、単位数、評価ポイントをGUIより入力しリストに格納
             if val["-subject-"] != "" and val["-units_num-"] != "" and val["-HPT-"] != "":
@@ -41,6 +44,10 @@ def main():
                 Pass_Fail = val["-Pass/Fail-"]
                 ls, HPT_num, total_HPT, total_units_num, all_total_units_num = GPA_calc(ls, subject, units_num, HPT, Pass_Fail, total_HPT, total_units_num, all_total_units_num)
                 txt = "" if HPT_num != "error" else "Point input error"
+                if state.login:
+                    # Todo: Submitボタンが押された際にfirebaseに保存する(ログイン時)
+                    firebase_save(ls, state, db)
+                print(ls)
                 win["-txt-"].update(txt)
                 win["-subject-"].update("")
                 win["-units_num-"].update("")
@@ -51,6 +58,7 @@ def main():
         elif eve == "-Final-":  #finalボタンが押された際の動作
             #Submitで入力された成績情報をもとにGPAを計算
             if total_HPT != 0 or total_units_num != 0:
+                print(ls)
                 GPA = total_HPT / total_units_num
                 SGPT = GPA * all_total_units_num
                 win["-GPA-"].update(f'{GPA:.1f}')
@@ -59,6 +67,7 @@ def main():
                 txt = "成績を入力またはCSVファイルをインポートしてください。"
                 win["-txt-"].update(txt)
         elif eve == "-File_Import-":    #ファイルインポートボタンが押された際の動作
+            # Todo: ファイルインポート時にfirebaseに保存する(ログイン時)
             #外部からCSVファイルをインポートし成績情報を入力する。
             File_name = val["-inputFilePath-"]
             if File_name:
@@ -73,6 +82,7 @@ def main():
                             Pass_Fail = val["-Pass/Fail-"]
                             ls, HPT_num, total_HPT, total_units_num, all_total_units_num = GPA_calc(ls, subject, units_num, HPT, Pass_Fail, total_HPT, total_units_num, all_total_units_num)
                     txt = ("ファイルが正常にインポートされました。")
+                    print(ls)
                 except Exception as e:
                     txt = f"ファイルのインポートに失敗しました。：{str(e)}"
             else:
@@ -90,17 +100,17 @@ def main():
                 writer.writerows(ls)
             sg.popup_quick("CSVファイルが保存されました。")
             header, data = create_table_for_csv()
-            layout_table = [[sg.Table(values=data, headings=header, display_row_numbers=True,
+            layout_tb = [[sg.Table(values=data, headings=header, display_row_numbers=True,
                                       auto_size_columns=True, num_rows=min(25, len(data)),
                                       expand_x=True, expand_y=True)],
                             [sg.Button("Close", key = "-Close-")]]
-            table_window = sg.Window('CSVファイル内容', layout_table, font = (None,15),
+            tb_win = sg.Window('CSVファイル内容', layout_tb, font = (None,15),
                                      size=(700,150), finalize=True, resizable = True)
             while True:
-                event, value = table_window.read()
-                if event == sg.WIN_CLOSED or event == "-Close-":
+                tb_eve = tb_win.read()
+                if tb_eve == sg.WIN_CLOSED or tb_eve == "-Close-":
                     break
-            table_window.close()
+            tb_win.close()
         elif eve == "-GPA_reset-":  #GPAリセットボタンが押された際の動作
             #成績情報を削除してよいかを確認し、成績情報を削除する
             res = sg.popup_yes_no("成績情報をリセットしますか？\n※データベースは削除されません。")

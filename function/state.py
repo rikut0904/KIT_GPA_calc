@@ -29,4 +29,4 @@ def update_state(login=None, p_login=None, p_signup=None, p_setting=None, user_n
     if idToken_param is not None:
         idToken = idToken_param
 
-    print(f"更新後: isLogin={isLogin}, popup_login={popup_login}, popup_signup={popup_signup}, popup_setting={popup_setting}, user_name={user_name}, user_email={user_email}, user_id={user_id}, idToken={idToken}")
+    print(f"更新後: isLogin={isLogin}, popup_login={popup_login}, popup_signup={popup_signup}, popup_setting={popup_setting}, user_name={user_name}, user_email={user_email}, user_id={user_id}")
