@@ -16,10 +16,11 @@ firebaseの利用は各人でプロジェクトを作成してください。\n
 > REACT_APP_FIREBASE_STORAGE_BUCKET=your_storage_bucket
 > REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
 > REACT_APP_FIREBASE_APP_ID=your_app_id
-> REACT_APP_FIREBASE_MEASUREMENTID=
+> REACT_APP_FIREBASE_MEASUREMENTID=your_measurement_id
 > ```
 その後、firebaseの設定ファイル"firebase_api.json"を作成してください。\n
-firebaseの設定ファイルは以下のように作成してください。
+firebaseの設定ファイルは以下のように作成してください。\n
+※firebase_api.jsonファイルはfirebaseの設定ファイルです。
 > ```
 > {
 > "type": "service_account",
