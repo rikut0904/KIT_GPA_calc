@@ -1,82 +1,38 @@
 import csv
-import pandas as pd # type: ignore
+import pandas as pd
 import PySimpleGUI as sg
-#GUIデザイン
-sg.theme("Default1")
-class GUI():
-    def __init__(self):
-        #GUIレイアウトの設定
-        layout = [[sg.T("　　　　  累積GPA："),sg.T("0.0", key="-GPA-")],
-                  [sg.T("正課学習ポイント："),sg.T("0.0", key="-SGPT-")],
-                  [sg.T("", key = "-txt-")],
-                  [sg.T("　　　 科目名："),sg.I("", key="-subject-",expand_x=True)],
-                  [sg.T("　　　 単位数："),sg.I("", key="-units_num-",expand_x=True)],
-                  [sg.T("評価ポイント："),sg.I("", key="-HPT-",expand_x=True)],
-                  [sg.Checkbox("合否科目",default=False, key="-Pass/Fail-")],
-                  [sg.T("過去のsubject_grades_data.csvファイル："),sg.I("", key="-inputFilePath-", expand_x=True),
-                   sg.FileBrowse("ファイル選択"),],
-                  [sg.Button("Submit", key="-Btn-"), sg.Button("Final", key="-Final-"),
-                   sg.Button("CSVファイル", key="-CSV-"), sg.Button("ファイルインポート", key="-File_Import-"),
-                   sg.Button("GPAリセット", key="-GPA_reset-")]]
-        self.win = sg.Window("GPA計算", layout, font = (None,15),
-                             finalize=True, resizable = True)
+from firebase_setting.firebase import get_auth, get_database
+from function import state
+from function.gui import GUI, reload_gui
+from function.logic_function import GPA_calc, create_table_for_csv, setting_function
 
-
-#評価ポイントをローマ字から数字へ変更
-def HPT_Checker(HPT):
-    HPT = HPT.upper()
-    if HPT == "S":
-        HPT_num = 4
-    elif HPT == "A":
-        HPT_num = 3
-    elif HPT == "B":
-        HPT_num = 2
-    elif HPT == "C":
-        HPT_num = 1
-    elif HPT == "D" or HPT == "F":
-        HPT_num = 0
-    elif HPT == "合" or HPT == "否":
-        HPT_num = ""
-    else:
-        HPT_num = "error"
-    return HPT_num
-
-
-#GPAの計算
-def GPA_calc(ls,subject,units_num,HPT,Pass_Fail,total_HPT,total_units_num, all_total_units_num):
-    HPT_num = HPT_Checker(HPT)
-    if HPT_num == "":
-        total_HPT, total_units_num = total_HPT, total_units_num
-        all_total_units_num += units_num
-        ls.append([subject, units_num, HPT, Pass_Fail])
-    elif HPT_num != "error":
-        if not Pass_Fail:
-            total_HPT += HPT_num * units_num
-            total_units_num += units_num
-        all_total_units_num += units_num
-        ls.append([subject, units_num, HPT, Pass_Fail])
-    return ls,HPT_num, total_HPT, total_units_num, all_total_units_num
-
-
-#CSVファイルを読み取り、表を作成
-def create_table_for_csv():
-    df = pd.read_csv("subject_grades_data.csv")
-    data = df.values.tolist()
-    header_list = list(df.columns)
-    return header_list, data
-
+# 必要なサービスを取得
+auth = get_auth()
+db = get_database()
 
 #メインプログラム
 def main():
     ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
     total_HPT, total_units_num, all_total_units_num = 0, 0, 0
-    gui = GUI()
+    state.update_state(login=False, p_login=False, p_signup=False, p_setting=False,
+                       user_name_param="ログインしてください",
+                       user_email_param="ログインしてください",
+                       user_id_param="ログインしてください",
+                       idToken_param="ログインしてください")
+    gui = GUI(state)
     win = gui.win
     while True:
         eve, val = win.read()
         if eve == sg.WIN_CLOSED:
             break
-        elif eve == "-Btn-":    #Submitボタンが押された際の動作
+        elif eve == "-Setting-":
+            state.update_state(p_setting=True)
+            win = reload_gui(state, win)
+            win["-UserName-"].update(state.user_name)
+            win["-email-"].update(state.user_email)
+        elif state.popup_setting:
+            win = setting_function(state, win, eve, val, auth, db)
+        elif eve == "-Submit-":    #Submitボタンが押された際の動作
             #科目名、単位数、評価ポイントをGUIより入力しリストに格納
             if val["-subject-"] != "" and val["-units_num-"] != "" and val["-HPT-"] != "":
                 subject = val["-subject-"]
@@ -147,7 +103,7 @@ def main():
             table_window.close()
         elif eve == "-GPA_reset-":  #GPAリセットボタンが押された際の動作
             #成績情報を削除してよいかを確認し、成績情報を削除する
-            res = sg.popup_yes_no("成績情報をリセットしますか？")
+            res = sg.popup_yes_no("成績情報をリセットしますか？\n※データベースは削除されません。")
             if res == "Yes":
                 ls.clear()
                 ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
