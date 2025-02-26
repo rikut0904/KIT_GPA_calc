@@ -6,8 +6,6 @@ from function import state
 from function.gui import GUI, reload_gui
 from function.logic_function import GPA_calc, create_table_for_csv, setting_function, check_subject_error
 
-# Todo: ログ、タイムスタンプの調整
-
 # 必要なサービスを取得
 auth = get_auth()
 db = get_database()
