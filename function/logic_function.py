@@ -21,8 +21,6 @@ def HPT_Checker(HPT):
         HPT_num = ""
     else:
         HPT_num = "error"
-    print("HPT:",HPT)
-    print("HPT_num:",HPT_num)
     return HPT_num
 
 #科目名の重複チェック
@@ -36,11 +34,11 @@ def check_subject(ls, subject):
         return True
 
 #科目のエラーチェック
-def check_subject_error(ls, subject, units_num, HPT, Pass_Fail):
+def check_subject_error(ls, subject, units_num, HPT, Pass_Fail, Teacher):
     HPT_num = HPT_Checker(HPT)
     if HPT_num != "error":
         if check_subject(ls, subject):
-            ls.append([subject, units_num, HPT, Pass_Fail])
+            ls.append([subject, units_num, HPT, Pass_Fail, Teacher])
             txt = ""
         else:
             txt = "subject error"
@@ -49,35 +47,57 @@ def check_subject_error(ls, subject, units_num, HPT, Pass_Fail):
     return txt, ls
 
 #GPAの計算
-def GPA_calc(ls):
-    total_HPT, total_units_num, all_total_units_num = 0, 0, 0
+def GPA_calc(ls, win, setting=False):
+    total_HPT, total_units_num, Graduation_total_units_num, all_total_units_num = 0, 0, 0, 0
+    GPA, SGPT = 0.00, 0.00
     txt = ""
     try:
         if len(ls) > 1:
             for data in ls[1:]:
-                subject, units_num, HPT, Pass_Fail = data
+                subject, units_num, HPT, Pass_Fail, Teacher = data
                 HPT_num = HPT_Checker(HPT)
-                if HPT_num == "":
-                    if HPT == "合":
-                        print("合格")
-                        all_total_units_num += units_num
-                    else:
-                        print("不合格")
-                elif HPT_num != "error":
-                    if HPT_num > 0:
-                        print("not error:",HPT_num)
-                        total_HPT += HPT_num * units_num
-                        total_units_num += units_num
-                        all_total_units_num += units_num
-                    else:
-                        print("落単科目")
+                if Teacher:
+                    print(f"教職科目:{subject} {units_num}単位")
+                    all_total_units_num += units_num
                 else:
-                    txt = "input error"
+                    if HPT_num == "":
+                        if HPT == "合":
+                            print(f"合格:{subject} {units_num}単位")
+                            Graduation_total_units_num += units_num
+                        else:
+                            print(f"不合格:{subject} {units_num}単位")
+                    elif HPT_num != "error":
+                        if HPT_num > 0:
+                            print(f"not error:{subject} {units_num}単位")
+                            total_HPT += HPT_num * units_num
+                            total_units_num += units_num
+                        elif HPT_num == 0:
+                            print(f"落単科目:{subject} {units_num}単位")
+                    else:
+                        txt = f"input error:{subject} {units_num}単位"
+            print(f"全評価点数:{total_HPT}, GPA計算科目数:{total_units_num}, 卒業科目数:{Graduation_total_units_num}, 全科目数:{all_total_units_num}")
+            Graduation_total_units_num += total_units_num
+            print(f"全評価点数:{total_HPT}, GPA計算科目数:{total_units_num}, 卒業科目数:{Graduation_total_units_num}, 全科目数:{all_total_units_num}")
+            all_total_units_num += Graduation_total_units_num
         else:
             txt = "入力がありません"
+
     except Exception as e:
         print(f"GPA計算に失敗しました: {e}")
-    return total_HPT, total_units_num, all_total_units_num, txt
+    print(f"全評価点数:{total_HPT}, GPA計算科目数:{total_units_num}, 卒業科目数:{Graduation_total_units_num}, 全科目数:{all_total_units_num}")
+    if total_HPT != 0 or total_units_num != 0:
+        GPA = total_HPT / total_units_num
+        SGPT = GPA * Graduation_total_units_num
+        print(ls)
+        win["-GPA-"].update(f'{GPA:.2f}')
+        win["-SGPT-"].update(f'{SGPT:.2f}')
+        win["-Graduation_total_units_num-"].update(f"{Graduation_total_units_num}単位")
+        win["-all_total_units_num-"].update(f"{all_total_units_num}単位")
+        win["-txt-"].update(txt)
+    else:
+        if setting and txt == "入力がありません":
+            txt = ""
+        win["-txt-"].update(txt)
 
 #CSVファイルを読み取り、表を作成
 def create_table_for_csv(state):
@@ -90,6 +110,7 @@ def setting_function(ls, state, win, eve, val, auth, db):
     if eve == "-setting_exit-":
         state.update_state(p_setting=False)
         win = reload_gui(state, win)
+        GPA_calc(ls, win, setting=True)
     elif eve == "-Auth_exit-":
         state.update_state(p_login=False, p_signup=False)
         win = reload_gui(state, win)
@@ -124,15 +145,15 @@ def setting_function(ls, state, win, eve, val, auth, db):
         state.update_state(user_name_param=UserName, user_email_param=email)
         win, ls = create_user(ls, password, state, win, auth, db)
     elif eve == "-Logout-": # ログアウト
-        ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
+        ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
         print(ls)
-        win = logout_function(state, win, auth)
+        win, ls  = logout_function(state, win, auth)
         win["-UserName-"].update(state.user_name)
         win["-email-"].update(state.user_email)
     elif eve == "-Delete-":
         delete_eve = sg.popup_yes_no("ユーザーを削除しますか？", font = (None, 15))
         if delete_eve == "Yes":
-            ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
+            ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
             print(ls)
-            win = delete_user(state, win, auth, db)
+            win, ls = delete_user(ls, state, win, auth, db)
     return win, ls
