@@ -1,5 +1,5 @@
-科目名,単位数,評価ポイント,合否科目
-a,2,S,False
-b,2,A,False
-c,1,合,True
-d,1,否,True
+科目名,単位数,評価ポイント,合否科目,教職科目
+a,2,S,False,False
+b,2,A,False,False
+c,1,合,True,False
+d,1,否,True,False
