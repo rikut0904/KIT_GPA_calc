@@ -1,7 +1,7 @@
 import csv
 import pandas as pd
 import PySimpleGUI as sg
-from firebase_setting.firebase import get_auth, get_database, firebase_save, update_subject, delete_subject
+from firebase_setting.firebase import get_auth, get_database, firebase_save, update_subject, delete_subject, delete_all_subject
 from function import state
 from function.gui import GUI, reload_gui
 from function.logic_function import GPA_calc, create_table_for_csv, setting_function, check_subject_error
@@ -12,7 +12,7 @@ db = get_database()
 
 #メインプログラム
 def main():
-    ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
+    ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
     state.update_state(login=False, p_login=False, p_signup=False, p_setting=False)
     gui = GUI(state)
     win = gui.win
@@ -35,7 +35,8 @@ def main():
                 units_num = int(val["-units_num-"])
                 HPT = val["-HPT-"]
                 Pass_Fail = val["-Pass/Fail-"]
-                txt, ls = check_subject_error(ls, subject, units_num, HPT, Pass_Fail)
+                Teacher = val["-Teacher-"]
+                txt, ls = check_subject_error(ls, subject, units_num, HPT, Pass_Fail, Teacher)
                 if state.isLogin:
                     ls = firebase_save(ls, state, db)
                 print(ls)
@@ -44,22 +45,13 @@ def main():
                 win["-units_num-"].update("")
                 win["-HPT-"].update("")
                 win["-Pass/Fail-"].update(False)
+                win["-Teacher-"].update(False)
             else:
                 txt = "必要事項を入力してください。"
                 win["-txt-"].update(txt)
         elif eve == "-Final-":  #finalボタンが押された際の動作
             #Submitで入力された成績情報をもとにGPAを計算
-            total_HPT, total_units_num, all_total_units_num, txt = GPA_calc(ls)
-            if total_HPT != 0 or total_units_num != 0:
-                print(ls)
-                GPA = total_HPT / total_units_num
-                SGPT = GPA * all_total_units_num
-                win["-GPA-"].update(f'{GPA:.2f}')
-                win["-SGPT-"].update(f'{SGPT:.2f}')
-                win["-all_total_units_num-"].update(f"{all_total_units_num}単位")
-                win["-txt-"].update(txt)
-            else:
-                win["-txt-"].update(txt)
+            GPA_calc(ls, win)
         elif eve == "-File_Import-":    #ファイルインポートボタンが押された際の動作
             #外部からCSVファイルをインポートし成績情報を入力する。
             File_name = val["-inputFilePath-"]
@@ -73,21 +65,19 @@ def main():
                             units_num = int(row[1])
                             HPT = row[2]
                             Pass_Fail = row[3]
-                            txt, ls = check_subject_error(ls, subject, units_num, HPT, Pass_Fail)
-                            if state.isLogin:
-                                ls = firebase_save(ls, state, db)
+                            Teacher = row[4]
+                            txt, ls = check_subject_error(ls, subject, units_num, HPT, Pass_Fail, Teacher)
                             txt = ("ファイルが正常にインポートされました。")
-                    print(ls)
+                    if state.isLogin:
+                        ls = firebase_save(ls, state, db)
+                    print(txt)
                 except Exception as e:
                     txt = f"ファイルのインポートに失敗しました。：{str(e)}"
             else:
                 txt = "ファイルが選択されていません。"
-            GPA = 0.00
-            SGPT = 0.00
-            win["-GPA-"].update(GPA)
-            win["-SGPT-"].update(SGPT)
-            win["-inputFilePath-"].update("")
             win["-txt-"].update(txt)
+            win["-inputFilePath-"].update("")
+            GPA_calc(ls, win)
         elif eve == "-CSV-" or eve == "-Subject_UI-":    #CSVファイルボタンが押された際の動作
             #Submitで入力された成績情報をCSVファイル化させ表形式でGUIに表示
             with open(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv", "w", newline="", encoding="utf-8") as f:
@@ -118,8 +108,9 @@ def main():
                         units_num = int(val["-units_num-"]) if val["-units_num-"] != "" else ""
                         HPT = val["-HPT-"] if val["-HPT-"] != "" else ""
                         Pass_Fail = val["-Pass/Fail-"] if val["-Pass/Fail-"] != "" else ""
-                        print(subject, units_num, HPT, Pass_Fail)
-                        ls = update_subject(ls, subject, units_num, HPT, Pass_Fail, state, db)
+                        Teacher = val["-Teacher-"] if val["-Teacher-"] != "" else ""
+                        print(subject, units_num, HPT, Pass_Fail, Teacher)
+                        ls = update_subject(ls, subject, units_num, HPT, Pass_Fail, Teacher, state, db)
                         with open(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv", "w", newline="", encoding="utf-8") as f:
                             writer = csv.writer(f)
                             writer.writerows(ls)
@@ -137,16 +128,19 @@ def main():
                 win = reload_gui(state, win)
         elif eve == "-GPA_reset-":  #GPAリセットボタンが押された際の動作
             #成績情報を削除してよいかを確認し、成績情報を削除する
-            res = sg.popup_yes_no("成績情報をリセットしますか？\n※データベースは削除されません。")
+            res = sg.popup_yes_no("成績情報をリセットしますか？\n※ログイン中はデータベースが削除されます。")
             if res == "Yes":
-                ls.clear()
-                ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
-                total_HPT, total_units_num, all_total_units_num = 0, 0 ,0
+                if state.isLogin:
+                    ls = delete_all_subject(ls, state, db)
+                else:
+                    ls.clear()
+                ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
                 GPA = 0.00
                 SGPT = 0.00
                 txt =""
                 win["-GPA-"].update(GPA)
                 win["-all_total_units_num-"].update(f"{0}単位")
+                win["-Graduation_total_units_num-"].update(f"{0}単位")
                 win["-SGPT-"].update(SGPT)
                 win["-txt-"].update(txt)
             else:
