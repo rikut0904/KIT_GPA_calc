@@ -126,7 +126,7 @@ def setting_function(ls, state, win, eve, val, auth, db):
     elif eve == "-Logout-": # ログアウト
         ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
         print(ls)
-        win = logout_function(state, win, auth)
+        win = logout_function(state, win, auth, db)
         win["-UserName-"].update(state.user_name)
         win["-email-"].update(state.user_email)
     elif eve == "-Delete-":
@@ -134,5 +134,5 @@ def setting_function(ls, state, win, eve, val, auth, db):
         if delete_eve == "Yes":
             ls = [["科目名", "単位数", "評価ポイント", "合否科目"]]
             print(ls)
-            win = delete_user(state, win, auth, db)
+            win, ls = delete_user(ls, state, win, auth, db)
     return win, ls
