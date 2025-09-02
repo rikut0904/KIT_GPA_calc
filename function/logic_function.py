@@ -2,7 +2,8 @@ import pandas as pd # type: ignore
 from function.gui import reload_gui
 import webbrowser
 from firebase_setting.firebase import login_function, create_user, logout_function, delete_user
-import PySimpleGUI as sg
+import tkinter as tk
+from tkinter import messagebox
 
 #評価ポイントをローマ字から数字へ変更
 def HPT_Checker(HPT):
@@ -27,11 +28,11 @@ def HPT_Checker(HPT):
 def check_subject(ls, subject):
     if len(ls) > 1:
         for data in ls[1:]:
-            if data[0] != subject:
-                return True
-        return False    
+            if data[0] == subject:  # 同じ科目名が見つかった場合
+                return False  # 重複あり
+        return True  # 重複なし
     else:
-        return True
+        return True  # リストが空またはヘッダーのみ
 
 #科目のエラーチェック
 def check_subject_error(ls, subject, units_num, HPT, Pass_Fail, Teacher):
@@ -55,6 +56,20 @@ def GPA_calc(ls, win, setting=False):
         if len(ls) > 1:
             for data in ls[1:]:
                 subject, units_num, HPT, Pass_Fail, Teacher = data
+                
+                # データ型を変換
+                try:
+                    units_num = int(units_num)
+                except (ValueError, TypeError):
+                    print(f"単位数の変換エラー: {units_num}")
+                    continue
+                
+                # ブール値の変換
+                if isinstance(Pass_Fail, str):
+                    Pass_Fail = Pass_Fail.lower() == 'true'
+                if isinstance(Teacher, str):
+                    Teacher = Teacher.lower() == 'true'
+                
                 HPT_num = HPT_Checker(HPT)
                 if Teacher:
                     print(f"教職科目:{subject} {units_num}単位")
@@ -89,21 +104,42 @@ def GPA_calc(ls, win, setting=False):
         GPA = total_HPT / total_units_num
         SGPT = GPA * Graduation_total_units_num
         print(ls)
-        win["-GPA-"].update(f'{GPA:.2f}')
-        win["-SGPT-"].update(f'{SGPT:.2f}')
-        win["-Graduation_total_units_num-"].update(f"{Graduation_total_units_num}単位")
-        win["-all_total_units_num-"].update(f"{all_total_units_num}単位")
-        win["-txt-"].update(txt)
+        win.update_widget("-GPA-", f'{GPA:.2f}')
+        win.update_widget("-SGPT-", f'{SGPT:.2f}')
+        win.update_widget("-Graduation_total_units_num-", f"{Graduation_total_units_num}単位")
+        win.update_widget("-all_total_units_num-", f"{all_total_units_num}単位")
+        win.update_widget("-txt-", txt)
     else:
         if setting and txt == "入力がありません":
             txt = ""
-        win["-txt-"].update(txt)
+        win.update_widget("-txt-", txt)
 
 #CSVファイルを読み取り、表を作成
-def create_table_for_csv(state):
-    df = pd.read_csv(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv")
-    data = df.values.tolist()
-    header_list = list(df.columns)
+def create_table_for_csv(state, ls=None):
+    print(f"create_table_for_csv呼び出し: ls={ls}, user_name={state.user_name}")
+    if ls is not None:
+        # lsが渡された場合は、それを直接使用
+        print(f"lsが渡されました。長さ: {len(ls)}")
+        if len(ls) > 0:
+            header_list = ls[0]
+            data = ls[1:] if len(ls) > 1 else []
+            print(f"ヘッダー: {header_list}, データ行数: {len(data)}")
+        else:
+            header_list = ["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]
+            data = []
+            print("lsが空のため、デフォルトヘッダーを使用")
+    else:
+        # 従来通りCSVファイルから読み込み
+        print(f"CSVファイルから読み込み: subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv")
+        try:
+            df = pd.read_csv(f"subject_grades_data_{'Guest' if state.user_name == '' else state.user_name}.csv")
+            data = df.values.tolist()
+            header_list = list(df.columns)
+            print(f"CSVファイルから読み込み成功: ヘッダー={header_list}, データ行数={len(data)}")
+        except FileNotFoundError:
+            header_list = ["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]
+            data = []
+            print("CSVファイルが見つからないため、デフォルトを使用")
     return header_list, data
 
 def setting_function(ls, state, win, eve, val, auth, db):
@@ -148,11 +184,11 @@ def setting_function(ls, state, win, eve, val, auth, db):
         ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
         print(ls)
         win, ls  = logout_function(state, win, auth)
-        win["-UserName-"].update(state.user_name)
-        win["-email-"].update(state.user_email)
+        win.update_widget("-UserName-", state.user_name)
+        win.update_widget("-email-", state.user_email)
     elif eve == "-Delete-":
-        delete_eve = sg.popup_yes_no("ユーザーを削除しますか？", font = (None, 15))
-        if delete_eve == "Yes":
+        delete_eve = messagebox.askyesno("確認", "ユーザーを削除しますか？")
+        if delete_eve:
             ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
             print(ls)
             win, ls = delete_user(ls, state, win, auth, db)

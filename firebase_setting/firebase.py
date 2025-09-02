@@ -1,313 +1,450 @@
+import firebase_admin
+from firebase_admin import credentials, auth, firestore
 import os
 from dotenv import load_dotenv
-import pyrebase
+from function import state
 from function.gui import reload_gui
-import firebase_admin
-from firebase_admin import firestore, credentials
-from datetime import datetime
+import tkinter as tk
+from tkinter import messagebox
 
-def get_firebase_config():
-    # .envファイルを読み込む
-    load_dotenv()
-    
-    # 環境変数から設定を取得
-    firebase_config = {
-        "apiKey": os.getenv("REACT_APP_FIREBASE_API_KEY"),
-        "authDomain": os.getenv("REACT_APP_FIREBASE_AUTH_DOMAIN"),
-        "databaseURL": os.getenv("REACT_APP_DATABASE_URL"),
-        "projectId": os.getenv("REACT_APP_DATABASE_PROJECT_ID"),
-        "storageBucket": os.getenv("REACT_APP_FIREBASE_STORAGE_BUCKET"),
-        "messagingSenderId": os.getenv("REACT_APP_FIREBASE_MESSAGING_SENDER_ID"),
-        "appId": os.getenv("REACT_APP_FIREBASE_APP_ID"),
-        "measurementId": os.getenv("REACT_APP_FIREBASE_MEASUREMENTID")
-    }
-    print(firebase_config)
-    
-    return firebase_config
+# 環境変数を読み込み
+load_dotenv()
 
-# Firebaseインスタンスを初期化
-if not firebase_admin._apps:
-    firebase = pyrebase.initialize_app(get_firebase_config())
-    cred = credentials.Certificate("firebase_setting/firebase_api.json")
-    firebase_admin.initialize_app(cred)
-
-# 各サービスのインスタンスを作成
-def get_auth():
-    return firebase.auth()
-
-def get_database():
-    return firestore.client()
-
-# ログイン
-def login_function(ls, password, state, win, auth, db):
-    print("ログイン")
+def load_from_local_csv(user_name):
+    """ローカルCSVファイルからデータを読み込み"""
     try:
-        user = auth.sign_in_with_email_and_password(state.user_email, password)
-        UserID = user["localId"]
+        import csv
+        filename = f"subject_grades_data_{user_name}.csv"
+        print(f"ローカルCSVファイルを読み込み中: {filename}")
         
-        # Firestore にデータを保存・取得
-        user_ref = db.collection("users").document(UserID)
-        user_data = user_ref.get()
-        if user_data.exists:
-            UserName = user_data.get("UserName")
-            state.update_state(user_name_param=UserName, user_id_param=UserID, idToken_param=user["idToken"])
-            ls = firebase_save(ls, state, db)
-            print(ls)
-        db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-            "user_name": UserName,
-            "action": f"{UserName}がログインしました",
-            "time_stamp": firestore.SERVER_TIMESTAMP
-        })
-        print(f"ログイン成功")
-        state.update_state(login=True, p_login=False)
-        win = reload_gui(state, win)
-        win["-UserName-"].update(state.user_name)
-        win["-email-"].update(state.user_email)
+        if os.path.exists(filename):
+            with open(filename, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                ls = list(reader)
+            print(f"ローカルCSVから読み込み成功: {len(ls)}行")
+            return ls
+        else:
+            print(f"ローカルCSVファイルが見つかりません: {filename}")
+            return [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
     except Exception as e:
-        print(f"ログインに失敗しました: {e}")
-        db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-            "user_name": "Guest",
-            "action": "ログインに失敗しました",
-            "time_stamp": firestore.SERVER_TIMESTAMP
-        })
-        txt = f"ログインに失敗しました。{e}"
-        win["-txt-"].update(txt)
-        state.update_state(user_name_param="", user_email_param="", user_id_param="", idToken_param="")
-    return win, ls
-
-# ユーザー作成
-def create_user(ls, password, state, win, auth, db):
-    print("ユーザー新規作成")
-    try:
-        user = auth.create_user_with_email_and_password(state.user_email, password)
-        UserID = user["localId"]
-        # Firestore にデータを保存
-        user_ref = db.collection("users").document(UserID)
-        user_data = user_ref.get()
-        state.update_state(user_id_param=UserID, idToken_param=user["idToken"])
-        if not(user_data.exists):
-            user_ref.set({
-                "UserName": state.user_name,
-                "email": state.user_email,
-                "time_stamp": firestore.SERVER_TIMESTAMP,
-            })
-            ls = firebase_save(ls, state, db)
-            print(ls)
-        db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-            "user_name": state.user_name,
-            "action": f"{state.user_name}が新規作成しました",
-            "time_stamp": firestore.SERVER_TIMESTAMP
-        })
-        print(f"ユーザーが作成されました。")
-        state.update_state(login=True, p_login=False, p_signup=False)
-        win = reload_gui(state, win)
-        win["-UserName-"].update(state.user_name)
-        win["-email-"].update(state.user_email)
-    except Exception as e:
-        print(f"ユーザーの作成に失敗しました: {e}")
-        db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-            "user_name": "Guest",
-            "action": "ユーザーの作成に失敗しました",
-            "time_stamp": firestore.SERVER_TIMESTAMP
-        })
-        txt = f"ユーザーの作成に失敗しました。{e}"
-        win["-txt-"].update(txt)
-        state.update_state(user_name_param="", user_email_param="", user_id_param="", idToken_param="")
-    return win, ls
-
-# ログアウト
-def logout_function(state, win, auth, db):
-    print("ログアウト")
-    db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-        "user_name": state.user_name,
-        "action": f"{state.user_name}がログアウトしました",
-        "time_stamp": firestore.SERVER_TIMESTAMP
-    })
-    auth.current_user = None
-    state.update_state(login=False, p_login=False, p_signup=False, user_name_param="", user_email_param="", user_id_param="", idToken_param="")
-    win = reload_gui(state, win)
-    win["-UserName-"].update(state.user_name)
-    win["-email-"].update(state.user_email) 
-    ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
-    return win, ls
-
-# ユーザー削除
-def delete_user(ls, state, win, auth, db):
-    print("ユーザー削除")
-    try:
-        ls = delete_all_subject(ls, state, db)
-        db.collection("users").document(state.user_id).delete()
-        auth.delete_user_account(state.idToken)
-        db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-            "user_name": state.user_name,
-            "action": f"{state.user_name}を削除しました",
-            "time_stamp": firestore.SERVER_TIMESTAMP
-        })
-        print(f"ユーザーが削除されました。")
-        state.update_state(login=False, user_name_param="", user_email_param="", user_id_param="", idToken_param="")
-        win = reload_gui(state, win)
-        win["-UserName-"].update(state.user_name)
-        win["-email-"].update(state.user_email)
-    except Exception as e:
-        db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-            "user_name": state.user_name,
-            "action": f"{state.user_name}がユーザーの削除に失敗しました",
-            "time_stamp": firestore.SERVER_TIMESTAMP
-        })
-        print(f"ユーザーの削除に失敗しました: {e}")
-    return win, ls
-
-# firebaseに保存
-def firebase_save(ls, state, db):
-    print("firebaseに保存")
-    user = db.collection("users").document(state.user_id)
-    user_sub = user.collection("subject_data")
-    user_data = user.get()
-    if user_data.exists:
-        if len(ls) > 1:
-            for data in ls[1:]:
-                subject_name, subject_unit, subject_grade, subject_pass_fail, subject_teacher = data
-                if subject_pass_fail == "True":
-                    subject_pass_fail = True
-                elif subject_pass_fail == "False":
-                    subject_pass_fail = False
-                if subject_teacher == "True":
-                    subject_teacher = True
-                elif subject_teacher == "False":
-                    subject_teacher = False
-                user_sub.document(subject_name).set({
-                    "subject_name": subject_name,
-                    "subject_unit": subject_unit,
-                    "subject_grade": subject_grade,
-                    "subject_pass_fail": subject_pass_fail,
-                    "subject_teacher": subject_teacher
-                })
-            user.update({
-                "time_stamp": firestore.SERVER_TIMESTAMP
-            })
-        db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-            "user_name": state.user_name,
-            "action": f"{state.user_name}が成績情報を保存しました",
-            "time_stamp": firestore.SERVER_TIMESTAMP
-        })
-            
-    return firebase_get(state, db)
-
-# firebaseから取得
-def firebase_get(state, db):
-    print("firebaseから取得")
-    ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
-    user_ref = db.collection("users").document(state.user_id).collection("subject_data").get()
-    if user_ref:
-        for doc in user_ref:
-            data = doc.to_dict()
-            ls.append([data["subject_name"], data["subject_unit"], data["subject_grade"], data["subject_pass_fail"], data["subject_teacher"]])
-        return ls
-    else:
+        print(f"ローカルCSV読み込みエラー: {e}")
         return [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
 
-# 科目修正
-def update_subject(ls, subject, units_num, HPT, Pass_Fail, Teacher, state, db):
-    print("科目修正")
-    if state.isLogin:
-        try:
-            data = db.collection("users").document(state.user_id).collection("subject_data").document(subject)
-            subject_data = data.get()
-
-            if subject_data.exists:
-                old_data = subject_data.to_dict()
-                old_units_num = old_data.get("subject_unit", "")
-                old_HPT = old_data.get("subject_grade", "")
-                old_Pass_Fail = old_data.get("subject_pass_fail", "")
-                old_Teacher = old_data.get("subject_teacher", "")
-                print(old_units_num, old_HPT, old_Pass_Fail, old_Teacher)
-            if units_num == "":
-                units_num = old_units_num
-            if HPT == "":
-                HPT = old_HPT
-            if Pass_Fail == "":
-                Pass_Fail = old_Pass_Fail
-            data.update({
-                "subject_unit": units_num,
-                "subject_grade": HPT,
-                "subject_pass_fail": Pass_Fail,
-                "subject_teacher": Teacher
-            })
-            db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-                "user_name": state.user_name,
-                "action": f"{state.user_name}が成績情報を修正しました",
-                "time_stamp": firestore.SERVER_TIMESTAMP
-            })
-            print(f"科目が修正されました。")
-            ls = firebase_get(state, db)
-        except Exception as e:
-            print(f"科目の修正に失敗しました: {e}")
-            db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-                "user_name": state.user_name,
-                "action": f"{state.user_name}が成績情報を修正に失敗しました",
-                "time_stamp": firestore.SERVER_TIMESTAMP
-            })
-    else:
-        try:
-            for data in ls[1:]:
-                old_subject, old_units_num, old_HPT, old_Pass_Fail, old_Teacher = data
-                print(old_subject, old_units_num, old_HPT, old_Pass_Fail, old_Teacher)
-                if old_subject == subject:
-                    if units_num == "":
-                        units_num = old_units_num
-                    if HPT == "":
-                        HPT = old_HPT
-                    if Pass_Fail == "":
-                        Pass_Fail = old_Pass_Fail
-                    data[1], data[2], data[3], data[4] = units_num, HPT, Pass_Fail, Teacher
-            print(f"科目が修正されました。")
-        except Exception as e:
-            print(f"科目の修正に失敗しました: {e}")
-    return ls
-
-# 科目一部削除
-def delete_subject(ls, subject, state, db):
-    print("科目削除")
-    if state.isLogin:
-        try:
-            user = db.collection("users").document(state.user_id)
-            user_sub = user.collection("subject_data")
-            user_sub.document(subject).delete()
-            db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-                "user_name": state.user_name,
-                "action": f"{state.user_name}が成績情報を削除しました",
-                "time_stamp": firestore.SERVER_TIMESTAMP
-            })
-            print(f"科目が削除されました。")
-            ls = firebase_get(state, db)
-        except Exception as e:
-            print(f"科目の削除に失敗しました: {e}")
-            db.collection("logs").document(f"log_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}").set({
-                "user_name": state.user_name,
-                "action": f"{state.user_name}が成績情報を削除に失敗しました",
-                "time_stamp": firestore.SERVER_TIMESTAMP
-            })
-    else:
-        try:
-            for data in ls[1:]:
-                if data[0] == subject:
-                    ls.remove(data)
-            print(f"科目が削除されました。")
-        except Exception as e:
-            print(f"科目の削除に失敗しました: {e}")
-    return ls
-
-# 成績情報全削除
-def delete_all_subject(ls, state, db):
-    print("成績情報全削除")
+# Firebase設定
+def get_auth():
+    """Firebase Authentication サービスを取得"""
     try:
-        user = db.collection("users").document(state.user_id)
-        subjects = user.collection("subject_data").stream()
-        for doc in subjects:
-            doc.reference.delete()
-        
-        print(f"成績情報が全て削除されました。")
-        ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
+        return auth
     except Exception as e:
-        print(f"成績情報の全削除に失敗しました: {e}")
-    return ls
+        print(f"Firebase Auth の初期化に失敗しました: {e}")
+        return None
+
+def get_database():
+    """Firestore データベースサービスを取得"""
+    try:
+        return firestore.client()
+    except Exception as e:
+        print(f"Firestore の初期化に失敗しました: {e}")
+        return None
+
+def initialize_firebase():
+    """Firebase を初期化"""
+    try:
+        # 既に初期化されている場合はスキップ
+        if firebase_admin._apps:
+            return True
+            
+        # 環境変数から設定を取得
+        project_id = os.getenv('REACT_APP_DATABASE_PROJECT_ID')
+        
+        # 設定が不完全な場合はエラーを返す
+        if not project_id:
+            print("Firebase設定が不完全です。")
+            print("実際のFirebase機能を使用するには、.envファイルに正しい設定を追加してください。")
+            print("必要な設定:")
+            print("- REACT_APP_DATABASE_PROJECT_ID")
+            return False
+            
+        # サービスアカウントキーファイルを使用
+        service_account_path = os.path.join(os.path.dirname(__file__), 'firebase_api.json')
+        
+        if os.path.exists(service_account_path):
+            # サービスアカウントキーファイルを使用
+            cred = credentials.Certificate(service_account_path)
+            firebase_admin.initialize_app(cred, {
+                'projectId': project_id,
+            })
+            print("Firebase が正常に初期化されました（サービスアカウントキー使用）")
+            return True
+        else:
+            print("サービスアカウントキーファイル（firebase_api.json）が見つかりません。")
+            print("Firebase Console > プロジェクト設定 > サービスアカウント から、サービスアカウントキーをダウンロードし、")
+            print("firebase_setting/firebase_api.jsonとして保存してください。")
+            return False
+        
+    except Exception as e:
+        print(f"Firebase の初期化に失敗しました: {e}")
+        return False
+
+def login_function(ls, password, state, win, auth_service, db):
+    """Firebase認証を使用したログイン機能"""
+    try:
+        email = state.current_user_email
+        
+        # 基本的なバリデーション
+        if not email or not password:
+            messagebox.showerror("エラー", "メールアドレスとパスワードを入力してください。")
+            return win, ls
+        
+        if "@" not in email:
+            messagebox.showerror("エラー", "有効なメールアドレスを入力してください。")
+            return win, ls
+        
+        # Firebase認証が利用可能でない場合
+        if not auth_service or not db:
+            messagebox.showerror("エラー", "Firebase認証サービスが利用できません。\nFirebase設定を確認してください。")
+            return win, ls
+        
+        # Firebase Authenticationを使用してログイン
+        try:
+            # Firebase Admin SDKを使用してユーザーを取得
+            user = auth_service.get_user_by_email(email)
+            
+            # ユーザーが存在する場合
+            if user:
+                # ログイン成功
+                user_name = user.display_name or email.split("@")[0]
+                
+                state.update_state(
+                    login=True,
+                    user_name_param=user_name,
+                    user_email_param=email,
+                    user_id_param=user.uid,
+                    p_login=False
+                )
+                
+                # Firestoreからデータを読み込み
+                try:
+                    print(f"Firestoreからデータを読み込み中... ユーザーID: {user.uid}")
+                    doc_ref = db.collection('users').document(user.uid)
+                    doc = doc_ref.get()
+                    if doc.exists:
+                        data = doc.to_dict()
+                        print(f"Firestoreデータ: {data}")
+                        
+                        # subjectsフィールドが存在しない場合は、ローカルCSVから読み込み
+                        if 'subjects' not in data:
+                            print("Firestoreにsubjectsフィールドがありません。ローカルCSVから読み込みます。")
+                            ls = load_from_local_csv(user_name)
+                            
+                            # 読み込んだデータをFirestoreに保存
+                            if len(ls) > 1:  # ヘッダー以外にデータがある場合
+                                try:
+                                    doc_ref.update({'subjects': ls})
+                                    print("ローカルデータをFirestoreに保存しました")
+                                except Exception as save_error:
+                                    print(f"Firestore保存エラー: {save_error}")
+                        else:
+                            ls = data.get('subjects', [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]])
+                        
+                        print(f"読み込んだ科目データ: {ls}")
+                        print("Firestoreからデータを読み込みました")
+                    else:
+                        # Firestoreにデータがない場合、ローカルCSVファイルから読み込み
+                        print("Firestoreにデータがありません。ローカルCSVファイルから読み込みを試行します。")
+                        ls = load_from_local_csv(user_name)
+                        
+                        # 読み込んだデータをFirestoreに保存
+                        if len(ls) > 1:  # ヘッダー以外にデータがある場合
+                            try:
+                                doc_ref.set({
+                                    'email': email,
+                                    'user_name': user_name,
+                                    'subjects': ls
+                                })
+                                print("ローカルデータをFirestoreに保存しました")
+                            except Exception as save_error:
+                                print(f"Firestore保存エラー: {save_error}")
+                        else:
+                            # データがない場合は初期化
+                            ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
+                            print("新規ユーザーとしてデータを初期化しました")
+                except Exception as db_error:
+                    print(f"Firestore読み込みエラー: {db_error}")
+                    # エラーの場合もローカルCSVから読み込みを試行
+                    ls = load_from_local_csv(user_name)
+                
+                messagebox.showinfo("成功", f"ログインしました\nユーザー: {user_name}")
+                win.close()
+                
+                # メインウィンドウを再作成し、データを渡す
+                from function.gui import GUI
+                from function.logic_function import create_table_for_csv, GPA_calc
+                
+                # テーブルデータを作成
+                print(f"テーブル作成前のls: {ls}")
+                header, data = create_table_for_csv(state, ls)
+                print(f"作成されたヘッダー: {header}")
+                print(f"作成されたデータ: {data}")
+                
+                # メインウィンドウを作成
+                main_gui = GUI(state, data, header)
+                main_win = main_gui.win
+                
+                # イベントハンドラーを設定
+                from KIT_GPA_calc import setup_event_handlers
+                setup_event_handlers(main_win, main_gui, ls, state, auth_service, db)
+                
+                # GPA計算を実行
+                GPA_calc(ls, main_gui)
+                
+                return main_win, ls
+            else:
+                messagebox.showerror("エラー", "ユーザーが見つかりません。")
+                return win, ls
+                
+        except Exception as firebase_error:
+            print(f"Firebase認証エラー: {firebase_error}")
+            messagebox.showerror("エラー", f"Firebase認証に失敗しました: {str(firebase_error)}")
+            return win, ls
+        
+    except Exception as e:
+        messagebox.showerror("エラー", f"ログインに失敗しました: {str(e)}")
+        return win, ls
+
+def create_user(ls, password, state, win, auth_service, db):
+    """Firebase認証を使用した新規ユーザー作成機能"""
+    try:
+        email = state.current_user_email
+        user_name = state.current_user_name
+        
+        # 基本的なバリデーション
+        if not email or not password or not user_name:
+            messagebox.showerror("エラー", "すべての項目を入力してください。")
+            return win, ls
+        
+        if "@" not in email:
+            messagebox.showerror("エラー", "有効なメールアドレスを入力してください。")
+            return win, ls
+        
+        if len(password) < 6:
+            messagebox.showerror("エラー", "パスワードは6文字以上で入力してください。")
+            return win, ls
+        
+        # Firebase認証が利用可能でない場合
+        if not auth_service or not db:
+            messagebox.showerror("エラー", "Firebase認証サービスが利用できません。\nFirebase設定を確認してください。")
+            return win, ls
+        
+        # Firebase Authenticationを使用してユーザーを作成
+        try:
+            # Firebase Admin SDKを使用してユーザーを作成
+            user = auth_service.create_user(
+                email=email,
+                password=password,
+                display_name=user_name
+            )
+            
+            # ユーザー作成成功
+            state.update_state(
+                login=True,
+                user_name_param=user_name,
+                user_email_param=email,
+                user_id_param=user.uid,
+                p_signup=False
+            )
+            
+            # Firestoreにユーザー情報を保存
+            try:
+                doc_ref = db.collection('users').document(user.uid)
+                doc_ref.set({
+                    'email': email,
+                    'user_name': user_name,
+                    'subjects': [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
+                })
+                print("Firestoreにユーザー情報を保存しました")
+            except Exception as db_error:
+                print(f"Firestore保存エラー: {db_error}")
+            
+            # 初期データを設定
+            ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
+            
+            messagebox.showinfo("成功", f"ユーザーを作成しました\nユーザー: {user_name}")
+            win.close()
+            
+            # メインウィンドウを再作成し、データを渡す
+            from function.gui import GUI
+            from function.logic_function import create_table_for_csv, GPA_calc
+            
+            # テーブルデータを作成
+            header, data = create_table_for_csv(state, ls)
+            
+            # メインウィンドウを作成
+            main_gui = GUI(state, data, header)
+            main_win = main_gui.win
+            
+            # イベントハンドラーを設定
+            from KIT_GPA_calc import setup_event_handlers
+            setup_event_handlers(main_win, main_gui, ls, state, auth_service, db)
+            
+            # GPA計算を実行
+            GPA_calc(ls, main_gui)
+            
+            return main_win, ls
+            
+        except Exception as firebase_error:
+            print(f"Firebase認証エラー: {firebase_error}")
+            messagebox.showerror("エラー", f"Firebase認証に失敗しました: {str(firebase_error)}")
+            return win, ls
+        
+    except Exception as e:
+        messagebox.showerror("エラー", f"ユーザー作成に失敗しました: {str(e)}")
+        return win, ls
+
+def logout_function(state, win, auth_service):
+    """ログアウト機能"""
+    try:
+        # ログアウト処理
+        state.update_state(
+            login=False,
+            user_name_param="",
+            user_email_param="",
+            user_id_param="",
+            idToken_param=""
+        )
+        
+        messagebox.showinfo("成功", "ログアウトしました")
+        win.close()
+        
+        # メインウィンドウを再作成
+        from function.gui import GUI
+        from function.logic_function import create_table_for_csv, GPA_calc
+        
+        # 初期データを設定
+        ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
+        
+        # テーブルデータを作成
+        header, data = create_table_for_csv(state, ls)
+        
+        # メインウィンドウを作成
+        main_gui = GUI(state, data, header)
+        main_win = main_gui.win
+        
+        # イベントハンドラーを設定
+        from KIT_GPA_calc import setup_event_handlers
+        setup_event_handlers(main_win, main_gui, ls, state, auth_service, None)
+        
+        # GPA計算を実行
+        GPA_calc(ls, main_gui)
+        
+        return main_win, ls
+        
+    except Exception as e:
+        messagebox.showerror("エラー", f"ログアウトに失敗しました: {str(e)}")
+        return win, [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
+
+def delete_user(ls, state, win, auth_service, db):
+    """ユーザー削除機能"""
+    try:
+        # Firebase Admin SDKを使用してユーザーを削除
+        if auth_service and state.user_id:
+            auth_service.delete_user(state.user_id)
+        
+        # データベースからユーザーデータを削除
+        if db and state.user_id:
+            doc_ref = db.collection('users').document(state.user_id)
+            doc_ref.delete()
+        
+        # 状態をリセット
+        state.update_state(
+            login=False,
+            user_name_param="",
+            user_email_param="",
+            user_id_param="",
+            idToken_param=""
+        )
+        
+        messagebox.showinfo("成功", "ユーザーを削除しました")
+        win.close()
+        
+        # メインウィンドウを再作成
+        from function.gui import GUI
+        from function.logic_function import create_table_for_csv, GPA_calc
+        
+        # 初期データを設定
+        ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
+        
+        # テーブルデータを作成
+        header, data = create_table_for_csv(state, ls)
+        
+        # メインウィンドウを作成
+        main_gui = GUI(state, data, header)
+        main_win = main_gui.win
+        
+        # イベントハンドラーを設定
+        from KIT_GPA_calc import setup_event_handlers
+        setup_event_handlers(main_win, main_gui, ls, state, auth_service, None)
+        
+        # GPA計算を実行
+        GPA_calc(ls, main_gui)
+        
+        return main_win, ls
+        
+    except Exception as e:
+        messagebox.showerror("エラー", f"ユーザー削除に失敗しました: {str(e)}")
+        return win, ls
+
+def firebase_save(ls, state, db):
+    """Firestoreにデータを保存"""
+    try:
+        if db and state.isLogin and state.user_id:
+            doc_ref = db.collection('users').document(state.user_id)
+            doc_ref.update({
+                'subjects': ls
+            })
+            print("データをFirestoreに保存しました")
+        return ls
+    except Exception as e:
+        print(f"データの保存に失敗しました: {e}")
+        return ls
+
+def update_subject(ls, subject, units_num, HPT, Pass_Fail, Teacher, state, db):
+    """科目情報を更新"""
+    try:
+        # 科目を検索して更新
+        for i, data in enumerate(ls):
+            if data[0] == subject:
+                ls[i] = [subject, units_num, HPT, Pass_Fail, Teacher]
+                break
+        
+        # Firestoreに保存
+        firebase_save(ls, state, db)
+        return ls
+    except Exception as e:
+        print(f"科目の更新に失敗しました: {e}")
+        return ls
+
+def delete_subject(ls, subject, state, db):
+    """科目を削除"""
+    try:
+        # 科目を検索して削除
+        ls = [data for data in ls if data[0] != subject]
+        
+        # Firestoreに保存
+        firebase_save(ls, state, db)
+        return ls
+    except Exception as e:
+        print(f"科目の削除に失敗しました: {e}")
+        return ls
+
+def delete_all_subject(ls, state, db):
+    """すべての科目を削除"""
+    try:
+        ls = [["科目名", "単位数", "評価ポイント", "合否科目", "教職科目"]]
+        
+        # Firestoreに保存
+        firebase_save(ls, state, db)
+        return ls
+    except Exception as e:
+        print(f"全科目の削除に失敗しました: {e}")
+        return ls

@@ -1,42 +1,32 @@
 # KIT_GPA_calc-金沢工業大学GPA計算ソフト
+## 現在修正中
+PySimpleGUIがサポート終了したため、tkinterへ変更しているため現在システムが利用できません。
+
 ## ソフト利用前に
-この計算ソフトは**pandas及びPySimpleGUI,dotenv,firebase-admin,webbrowser,npm**の外部ライブラリを使用しております。pip installにてこのライブラリ群をインストールしてください。また、PySimpleGUIは個人用のみ無償利用が可能となっております。ソフトを利用するためにサインインが必要ですのでサインインをお忘れなく行ってください。
-### PySimpleGUI
-[PySimpleGUIのサインインURLはこちらです](https://pysimplegui.com/pricing)
-### firebase
-firebaseの利用は各人でプロジェクトを作成してください。
-[firebaseのプロジェクトはこちらから作成してください](https://console.firebase.google.com/u/0/)  
-その後、firebaseの設定ファイルを作成してください。  
-設定ファイルは以下のように.envファイルを作成してください。
-> ```
-> REACT_APP_FIREBASE_API_KEY=your_api_key
-> REACT_APP_FIREBASE_AUTH_DOMAIN=your_auth_domain
-> REACT_APP_DATABASE_URL=your_database_url
-> REACT_APP_DATABASE_PROJECT_ID=your_project_id
-> REACT_APP_FIREBASE_STORAGE_BUCKET=your_storage_bucket
-> REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-> REACT_APP_FIREBASE_APP_ID=your_app_id
-> REACT_APP_FIREBASE_MEASUREMENTID=your_measurement_id
-> ```
-その後、firebaseの設定ファイル"firebase_api.json"を作成してください。  
-firebaseの設定ファイルは以下のように作成してください。  
-※firebase_api.jsonファイルはfirebaseの設定ファイルです。
-> ```
-> {
-> "type": "service_account",
-> "project_id": "your_project_id",
-> "private_key_id": "your_private_key_id",
-> "private_key": "your_private_key",
-> "client_email": "your_client_email",
-> "client_id": "your_client_id",
-> "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-> "token_uri": "https://oauth2.googleapis.com/token",
-> "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-> "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/your_client_email",
-> "universe_domain": "googleapis.com"
-> }
-> ```
-作成したfirebase_api.jsonファイルを**firebase_setting**フォルダに格納してください。
+この計算ソフトは**pandas、tkinter、dotenv、firebase-admin**の外部ライブラリを使用しております。pip installにてこのライブラリ群をインストールしてください。
+
+### Firebase設定
+Firebase認証機能を使用するには、Firebaseプロジェクトの設定が必要です。
+
+#### 1. Firebaseプロジェクトの作成
+[Firebase Console](https://console.firebase.google.com/u/0/)でプロジェクトを作成してください。
+
+#### 2. 環境変数の設定
+プロジェクトルートに`.env`ファイルを作成し、以下の設定を追加してください：
+```
+REACT_APP_FIREBASE_API_KEY=your_api_key
+REACT_APP_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+REACT_APP_DATABASE_PROJECT_ID=your_project_id
+```
+
+#### 3. サービスアカウントキーの設定
+Firebase Console > プロジェクト設定 > サービスアカウント から、サービスアカウントキーをダウンロードし、`firebase_setting/firebase_api.json`として保存してください。
+
+#### 4. Authentication の有効化
+Firebase Console > Authentication > Sign-in method で、Email/Password認証を有効にしてください。
+
+#### 5. Firestore の有効化
+Firebase Console > Firestore Database でデータベースを作成してください。
 ## 利用方法
 ### GUIからの入力
 GUIの科目名、単位数、評価ポイント、合否科目という個所を入力し下部ボタン**Submit**を押下することにより、内部のリストに成績情報として格納される。
@@ -85,5 +75,5 @@ GitHubの本リポジトリを[GitHub](https://github.com/rikut0904/KIT_GPA_calc
 ## 参考
 [金沢工業大学](https://www.kanazawa-it.ac.jp)  
 [金沢工業大学GPA](https://www.kanazawa-it.ac.jp/campus_guide/2024/chapter_3/list_3/page_3.html)  
-[PySimpleGUI](https://pysimplegui.com/pricing)  
+  
 [firebase](https://console.firebase.google.com/u/0/)
